@@ -1,65 +1,110 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
 export default function Home() {
+  const [events, setEvents] = useState([]);
+  const [selectedMemo, setSelectedMemo] = useState<any>(null); // 선택된 메모 상태
+
+  useEffect(() => {
+    fetch('/api/memos')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) setEvents(data);
+      })
+      .catch(err => console.error(err));
+  }, []);
+
+  // 메모 클릭 시 실행되는 함수
+  const handleEventClick = (info: any) => {
+    // 클릭한 이벤트의 정보를 state에 저장 (팝업 열기)
+    setSelectedMemo({
+      title: info.event.title,
+      date: info.event.startStr,
+      url: info.event.extendedProps.url
+    });
+  };
+
+  // 팝업 닫기 함수
+  const closePopup = () => setSelectedMemo(null);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main style={{ padding: '20px', height: '100vh', backgroundColor: '#f8f9fa', color: '#333' }}>
+      <h1 style={{ marginBottom: '20px', fontWeight: 'bold' }}>📅 내 메모 캘린더</h1>
+      
+      {/* 캘린더 영역 */}
+      <div style={{ 
+        backgroundColor: 'white', 
+        padding: '20px', 
+        borderRadius: '15px', 
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)' 
+      }}>
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          events={events}
+          height="auto"
+          eventClick={handleEventClick} // 클릭 이벤트 연결
+          eventColor="#3788d8" // 이벤트 배경색 (파란색)
+          eventDisplay="block" // 텍스트 꽉 차게 보여주기
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth'
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      </div>
+
+      {/* ✨ 상세 보기 팝업 (Modal) ✨ */}
+      {selectedMemo && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', // 배경 어둡게
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 1000
+        }} onClick={closePopup}>
+          <div style={{
+            backgroundColor: 'white', padding: '30px', borderRadius: '15px',
+            width: '90%', maxWidth: '500px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }} onClick={(e) => e.stopPropagation()}> {/* 내부 클릭 시 닫힘 방지 */}
+            
+            <h3 style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>{selectedMemo.date}</h3>
+            <p style={{ fontSize: '18px', lineHeight: '1.6', margin: '20px 0', wordBreak: 'break-all' }}>
+              {selectedMemo.title}
+            </p>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              {selectedMemo.url && (
+                <a 
+                  href={selectedMemo.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    flex: 1, textAlign: 'center', padding: '12px', 
+                    backgroundColor: '#0070f3', color: 'white', 
+                    borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold'
+                  }}
+                >
+                  🔗 원본 링크 보기
+                </a>
+              )}
+              <button 
+                onClick={closePopup}
+                style={{
+                  flex: 1, padding: '12px', 
+                  backgroundColor: '#eee', border: 'none', 
+                  borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold'
+                }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }
