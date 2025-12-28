@@ -13,7 +13,6 @@ export async function POST(request) {
 
     const { text, url, title, image } = await request.json();
 
-    // @google/genai 라이브러리 형식에 맞게 수정
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
@@ -32,29 +31,37 @@ export async function POST(request) {
 4. 응답은 오직 JSON 배열만 포함해야 하며, 설명이나 마크다운 코드 블록을 포함하지 마세요.
 `;
 
-    const contents = [{ role: "user", parts: [{ text: prompt }] }];
+    const parts = [{ text: prompt }];
 
     // 이미지가 있는 경우 멀티모달 처리
     if (image && image.startsWith("data:image")) {
-      const base64Data = image.split(",")[1];
-      const mimeType = image.split(";")[0].split(":")[1];
-      contents[0].parts.push({
-        inline_data: {
-          data: base64Data,
-          mime_type: mimeType,
-        },
-      });
+      try {
+        const base64Data = image.split(",")[1];
+        const mimeType = image.split(";")[0].split(":")[1];
+        if (base64Data && mimeType) {
+          parts.push({
+            inlineData: {
+              data: base64Data,
+              mimeType: mimeType,
+            },
+          });
+        }
+      } catch (imgErr) {
+        console.error("Image parsing error:", imgErr);
+      }
     }
 
     // @google/genai 형식으로 호출
+    // Note: contents can be a string or an array of Content objects
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: contents,
+      model: "gemini-2.0-flash", // 2.5 보다는 검증된 2.0 또는 1.5 추천
+      contents: [{ role: "user", parts: parts }],
     });
 
     const rawText = (response.text ?? "").trim();
+    console.log("Gemini Raw Response:", rawText);
 
-    // JSON 추출 (코드 블록이나 잡다한 텍스트 방어)
+    // JSON 추출
     let tags = [];
     try {
       const jsonMatch = rawText.match(/\[.*\]/s);
