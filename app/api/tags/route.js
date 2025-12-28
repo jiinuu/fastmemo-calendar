@@ -13,8 +13,8 @@ export async function POST(request) {
 
     const { text, url, title, image } = await request.json();
 
-    const genAI = new GoogleGenAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // @google/genai 라이브러리 형식에 맞게 수정
+    const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
 사용자가 웹브라우저에서 메모를 저장했습니다. 이 메모에 대해 나중에 검색하고 관리하기 쉬운 태그를 3~5개 생성해 주세요.
@@ -32,23 +32,27 @@ export async function POST(request) {
 4. 응답은 오직 JSON 배열만 포함해야 하며, 설명이나 마크다운 코드 블록을 포함하지 마세요.
 `;
 
-    const parts = [{ text: prompt }];
+    const contents = [{ role: "user", parts: [{ text: prompt }] }];
 
     // 이미지가 있는 경우 멀티모달 처리
     if (image && image.startsWith("data:image")) {
       const base64Data = image.split(",")[1];
       const mimeType = image.split(";")[0].split(":")[1];
-      parts.push({
-        inlineData: {
+      contents[0].parts.push({
+        inline_data: {
           data: base64Data,
-          mimeType: mimeType,
+          mime_type: mimeType,
         },
       });
     }
 
-    const result = await model.generateContent(parts);
-    const response = await result.response;
-    const rawText = response.text().trim();
+    // @google/genai 형식으로 호출
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: contents,
+    });
+
+    const rawText = (response.text ?? "").trim();
 
     // JSON 추출 (코드 블록이나 잡다한 텍스트 방어)
     let tags = [];
@@ -61,7 +65,6 @@ export async function POST(request) {
       }
     } catch (e) {
       console.error("Failed to parse tags JSON:", rawText);
-      // 포맷 실패 시 간단한 대체 로직이나 빈 배열
       tags = ["자동생성"];
     }
 
